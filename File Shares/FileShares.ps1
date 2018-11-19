@@ -129,8 +129,8 @@ function formatAPIData {
         return
     }
 
-    $api__Server_id = (Get-ITGlueConfigurations -filter_organization_id $api__org_id -filter_name $currentServer)[0].id
-
+    $api__Server_id = (Get-ITGlueConfigurations -filter_organization_id $api__org_id -filter_name $currentServer).data.id
+	Write-Host "API ORG ID $($api__org_id)"
     $api__body = @{
         type = "flexible_assets"
         attributes = @{
@@ -146,7 +146,8 @@ function formatAPIData {
             }
         }
     }
-
+	#$outStr = $api__body | Select-Object 'attributes' 
+	#Write-Host ($api__body['attributes']['traits'] | Out-String)
     return $api__body
 }
 
@@ -165,13 +166,17 @@ else {
     }
 
     $computer = $env:COMPUTERNAME
+	
     $SaveData = @()
 
     $Files = gwmi -Class win32_share -ComputerName $computer -Filter "Type=0" | Where-Object{$_.Name -NotMatch "^print|^NETLOGON|^MTATempStore|^prnproc"}
-    $shares = $Files| select -ExpandProperty Name
+    
+	$shares = $Files| select -ExpandProperty Name
+	
     $description =  $Files| select -ExpandProperty Description
+	$Files| select -ExpandProperty Description
     $path = $Files| select -ExpandProperty Path
-    $server= ([regex]::matches($Files, "(?<=[\\][\\])[^\\]+"))
+    $server = ([regex]::matches($Files, "(?<=[\\][\\])[^\\]+"))
 
     $i=0
     foreach ($share in $shares) {
@@ -201,20 +206,20 @@ else {
                     }
                     $permissions= $permissions + "<p>$Domain\$user $Perm</p>"
                 } # End foreach $ACL
-                $ShareDescription= $description[$i]
-                $DiskPath= $path[$i]
+                $ShareDescription= $description
+                $DiskPath= $path
 
                 if(!$silent){writeOutput}
 
                 if($url -or $files) {
                     $PostData = @{
-                        #"Organization" = "$organization"
+                        "Organization" = "$organization"
                         "Share Name" = "$share"
                         "Share Description" = "$ShareDescription"
                         "Server" = "$currentServer"
                         "Share Path" = "$writePath"
                         "Disk Path" = "$DiskPath"
-                        #"Permissions" = "$permissions"
+                        "Permissions" = "$permissions"
                     }
                 }
                 if($file) {
@@ -235,7 +240,8 @@ else {
                         Write-Host "File Shares flex asset configuration file found!" -ForegroundColor Green
 
                         $api__body = formatAPIData # format data for API call
-                        $api__org_id = $api__body.data.attributes.organization_id
+						Write-Host ( $api__body.attributes.organization_id | Out-String )
+                        $api__org_id = $api__body.attributes.organization_id
                         $api__flex_asset_id = $api_config.flex_asset_id
                         
                         if($api__org_id) {
